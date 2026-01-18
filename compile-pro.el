@@ -1,7 +1,7 @@
 ;;; compile-pro.el --- Per-project compile utitlities for Emacs -*- lexical-binding: t; -*-
 
 ;; Author: Aki Suzuki <suzuki11109@gmail.com>
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: tools, compile, project
 ;; URL: https://github.com/suzuki11109/compile-pro
