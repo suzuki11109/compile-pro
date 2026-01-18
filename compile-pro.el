@@ -21,82 +21,79 @@
   :group 'compilation
   :prefix "compile-pro-")
 
-(defvar compile-pro-project-compile-history-alist nil
+(defvar project-compile-history-alist nil
   "Alist of project roots to their compile histories.")
 
-(add-to-list 'savehist-additional-variables 'compile-pro-project-compile-history-alist)
+(add-to-list 'savehist-additional-variables 'project-compile-history-alist)
 
-(defun compile-pro-get-project-compile-history ()
+(defun get-project-compile-history ()
   "Get compile history for current project."
   (let* ((project (project-current))
          (project-root (when project (project-root project)))
          (history-key (or project-root default-directory)))
-    (alist-get history-key compile-pro-project-compile-history-alist nil nil #'string=)))
+    (alist-get history-key project-compile-history-alist nil nil #'string=)))
 
-(defun compile-pro-save-project-compile-history (history)
+(defun save-project-compile-history (history)
   "Save compile history for current project."
   (let* ((project (project-current))
          (project-root (when project (project-root project)))
          (history-key (or project-root default-directory)))
-    (setf (alist-get history-key compile-pro-project-compile-history-alist nil nil #'string=)
+    (setf (alist-get history-key project-compile-history-alist nil nil #'string=)
           history)))
 
-(defun compile-pro-project-compile-read-command (orig-fun &rest args)
+;; for interfactive normal compile
+(defun project-compile-read-command (orig-fun &rest args)
   "Advice to use project-specific compile history."
   (let ((compile-history (get-project-compile-history)))
     (prog1 (apply orig-fun args)
-      (compile-pro-save-project-compile-history compile-history))))
+      (save-project-compile-history compile-history))))
 
-(advice-add 'compilation-read-command :around #'compile-pro-project-compile-read-command)
+(advice-add 'compilation-read-command :around #'project-compile-read-command)
 
-(defun compile-pro--compile (compile-dir command &optional project-history)
-  "Internal function to execute compilation in COMPILE-DIR with COMMAND.
-Optionally save to PROJECT-HISTORY if provided and command is valid."
-  (compile-pro-compile-in-dir compile-dir command)
-  (when (and project-history command (not (string-empty-p command)))
-    (let ((updated-history (cons command (remove command (or project-history '())))))
-      (compile-pro-save-project-compile-history updated-history))))
-
-;;;###autoload
 (defun compile-pro-compile-in-dir (dir &optional command)
   "Run `compile' in the selected directory."
   (interactive "DCompile in: ")
   (let ((default-directory dir))
     (if command
         (compile command)
-      (call-interactively #'compile))))
+      (call-interactively #'compile)))) ;; TODO: custom prompt "Compile command in `%s': "
 
-;;;###autoload
+;; TODO: M-r to load command from history
 (defun compile-pro-compile (&optional command)
   "Run `compile' in the current project's root directory or current working directory."
   (interactive)
-  (let* ((project-history (compile-pro-get-project-compile-history))
-         (project (project-current))
+  (let* ((project (project-current))
+         (project-history (when project (get-project-compile-history)))
+         (history (if project (or project-history '()) compile-history))
+         (compile-dir (if project (project-root project) default-directory))
+         (initial-text (when (use-region-p)
+                         (string-trim (buffer-substring-no-properties (region-beginning) (region-end)))))
          (compilation-buffer-name-function (if project project-compilation-buffer-name-function compilation-buffer-name-function))
-         (compile-dir (if project (project-root project) default-directory)))
-    (compile-pro--compile compile-dir command project-history)))
+         )
+    (compile-pro-compile-in-dir compile-dir command)
+    (when (and project (and command (not (string-empty-p command))))
+      (let ((updated-history (cons command (remove command (or project-history '())))))
+        (save-project-compile-history updated-history))))
+  )
 
-;;;###autoload
-(defun compile-pro-compile-from-project-history ()
-  "Run `compile' with a choice from project's history.
-Fallback to general compile history if not in a project."
+(defun compile-pro-compile-from-history ()
+  "Run `compile' with a choice from project's compile history."
   (interactive)
   (let* ((project (project-current))
          (project-history (when project (get-project-compile-history)))
+         (history (if project (or project-history '()) compile-history))
          (compile-dir (if project (project-root project) default-directory))
-         (compilation-buffer-name-function
-          (if project project-compilation-buffer-name-function
-            compilation-buffer-name-function))
-         (history-to-use (if project (or project-history '()) compile-history))
          (initial-text (when (use-region-p)
-                         (string-trim (buffer-substring-no-properties
-                                       (region-beginning) (region-end)))))
+                         (string-trim (buffer-substring-no-properties (region-beginning) (region-end)))))
          (command (completing-read
-                   (format-message "Compile command in `%s': "
-                                   (abbreviate-file-name compile-dir))
-                   history-to-use nil nil initial-text 'compile-history)))
-    (when (and command (not (string-empty-p command)))
-      (compile-pro--compile compile-dir command project-history))))
+                   (format-message "Compile command in `%s': " (abbreviate-file-name compile-dir))
+                   history nil nil initial-text 'compile-history))
+         (compilation-buffer-name-function (if project project-compilation-buffer-name-function compilation-buffer-name-function))
+         )
+    (compile-pro-compile-in-dir compile-dir command)
+    (when (and project (and command (not (string-empty-p command))))
+      (let ((updated-history (cons command (remove command (or project-history '())))))
+        (save-project-compile-history updated-history)))))
 
 (provide 'compile-pro)
 
