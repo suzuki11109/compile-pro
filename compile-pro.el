@@ -41,22 +41,13 @@
     (setf (alist-get history-key project-compile-history-alist nil nil #'string=)
           history)))
 
-;; for interfactive normal compile
-(defun project-compile-read-command (orig-fun &rest args)
-  "Advice to use project-specific compile history."
-  (let ((compile-history (get-project-compile-history)))
-    (prog1 (apply orig-fun args)
-      (save-project-compile-history compile-history))))
-
-(advice-add 'compilation-read-command :around #'project-compile-read-command)
-
 (defun compile-pro-compile-in-dir (dir &optional command)
   "Run `compile' in the selected directory."
   (interactive "DCompile in: ")
   (let ((default-directory dir))
     (if command
         (compile command)
-      (call-interactively #'compile)))) ;; TODO: custom prompt "Compile command in `%s': "
+      (call-interactively #'compile))))
 
 ;; TODO: M-r to load command from history
 (defun compile-pro-compile (&optional command)
@@ -66,10 +57,13 @@
          (project-history (when project (get-project-compile-history)))
          (history (if project (or project-history '()) compile-history))
          (compile-dir (if project (project-root project) default-directory))
+         (compilation-buffer-name-function (if project project-compilation-buffer-name-function compilation-buffer-name-function))
          (initial-text (when (use-region-p)
                          (string-trim (buffer-substring-no-properties (region-beginning) (region-end)))))
-         (compilation-buffer-name-function (if project project-compilation-buffer-name-function compilation-buffer-name-function))
-         )
+         (command (if command
+                      command
+                    (read-string (format-message "Compile command in `%s': " (abbreviate-file-name compile-dir))
+                                 initial-text))))
     (compile-pro-compile-in-dir compile-dir command)
     (when (and project (and command (not (string-empty-p command))))
       (let ((updated-history (cons command (remove command (or project-history '())))))
@@ -83,12 +77,12 @@
          (project-history (when project (get-project-compile-history)))
          (history (if project (or project-history '()) compile-history))
          (compile-dir (if project (project-root project) default-directory))
+         (compilation-buffer-name-function (if project project-compilation-buffer-name-function compilation-buffer-name-function))
          (initial-text (when (use-region-p)
                          (string-trim (buffer-substring-no-properties (region-beginning) (region-end)))))
          (command (completing-read
                    (format-message "Compile command in `%s': " (abbreviate-file-name compile-dir))
                    history nil nil initial-text 'compile-history))
-         (compilation-buffer-name-function (if project project-compilation-buffer-name-function compilation-buffer-name-function))
          )
     (compile-pro-compile-in-dir compile-dir command)
     (when (and project (and command (not (string-empty-p command))))
