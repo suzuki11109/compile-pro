@@ -1,7 +1,7 @@
 ;;; compile-pro.el --- Per-project compile utitlities for Emacs -*- lexical-binding: t; -*-
 
 ;; Author: Aki Suzuki <suzuki11109@gmail.com>
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: tools, compile, project
 ;; URL: https://github.com/suzuki11109/compile-pro
@@ -63,8 +63,8 @@
                          (string-trim (buffer-substring-no-properties (region-beginning) (region-end)))))
          (command (if command
                       command
-                    (read-string (format-message "Compile command in `%s': " (abbreviate-file-name compile-dir))
-                                 initial-text))))
+                    (read-shell-command (format-message "Compile command in `%s': " (abbreviate-file-name compile-dir))
+                                        initial-text))))
     (compile-pro-compile-in-dir compile-dir command)
     (when (and project (and command (not (string-empty-p command))))
       (let ((updated-history (cons command (remove command (or project-history '())))))
