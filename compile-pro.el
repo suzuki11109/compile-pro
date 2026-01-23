@@ -1,7 +1,7 @@
 ;;; compile-pro.el --- Per-project compile utitlities for Emacs -*- lexical-binding: t; -*-
 
 ;; Author: Aki Suzuki <suzuki11109@gmail.com>
-;; Version: 0.2.2
+;; Version: 0.2.3
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: tools, compile, project
 ;; URL: https://github.com/suzuki11109/compile-pro
@@ -21,25 +21,29 @@
   :group 'compilation
   :prefix "compile-pro-")
 
-(defvar project-compile-history-alist nil
+(defvar compile-pro--history-alist nil
   "Alist of project roots to their compile histories.")
 
-(with-eval-after-load 'savehist
-  (add-to-list 'savehist-additional-variables 'project-compile-history-alist))
+;; Add to savehist immediately if savehist is already loaded,
+;; or when it loads later
+(if (featurep 'savehist)
+    (add-to-list 'savehist-additional-variables 'compile-pro--history-alist)
+  (with-eval-after-load 'savehist
+    (add-to-list 'savehist-additional-variables 'compile-pro--history-alist)))
 
 (defun get-project-compile-history ()
   "Get compile history for current project."
   (let* ((project (project-current))
          (project-root (when project (project-root project)))
          (history-key (or project-root default-directory)))
-    (alist-get history-key project-compile-history-alist nil nil #'string=)))
+    (alist-get history-key compile-pro--history-alist nil nil #'string=)))
 
 (defun save-project-compile-history (history)
   "Save compile history for current project."
   (let* ((project (project-current))
          (project-root (when project (project-root project)))
          (history-key (or project-root default-directory)))
-    (setf (alist-get history-key project-compile-history-alist nil nil #'string=)
+    (setf (alist-get history-key compile-pro--history-alist nil nil #'string=)
           history)))
 
 (defun compile-pro-compile-in-dir (dir &optional command)
@@ -83,7 +87,7 @@
                          (string-trim (buffer-substring-no-properties (region-beginning) (region-end)))))
          (command (completing-read
                    (format-message "Compile command in `%s': " (abbreviate-file-name compile-dir))
-                   history nil nil initial-text 'compile-history))
+                   history nil nil initial-text 'history))
          )
     (compile-pro-compile-in-dir compile-dir command)
     (when (and project (and command (not (string-empty-p command))))
